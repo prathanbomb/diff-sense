@@ -1,0 +1,59 @@
+<idea-plugin>
+    <id>com.prathanbomb.diffsense</id>
+    <name>AI Commit Assistant</name>
+    <vendor>prathanbomb</vendor>
+
+    <description><![CDATA[
+    Automatically generate Git commit messages using AI/LLM providers.
+    <br/><br/>
+    <b>Features:</b>
+    <ul>
+        <li>Generate commit messages from staged changes with one click</li>
+        <li>Support for OpenAI, Anthropic (Claude), and local Ollama</li>
+        <li>Customizable prompt templates</li>
+        <li>Secure API key storage using system keychain</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.vcs</depends>
+    <depends>Git4Idea</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Settings -->
+        <applicationService
+            serviceImplementation="com.prathanbomb.diffsense.settings.PluginSettingsState"/>
+
+        <applicationService
+            serviceImplementation="com.prathanbomb.diffsense.settings.ApiKeyManager"/>
+
+        <projectService
+            serviceImplementation="com.prathanbomb.diffsense.services.GitDiffService"/>
+
+        <applicationService
+            serviceImplementation="com.prathanbomb.diffsense.services.CommitMessageGenerator"/>
+
+        <applicationConfigurable
+            parentId="tools"
+            instance="com.prathanbomb.diffsense.settings.PluginSettingsConfigurable"
+            id="com.prathanbomb.diffsense.settings"
+            displayName="AI Commit"/>
+
+        <!-- Notifications -->
+        <notificationGroup
+            id="AI Commit Assistant"
+            displayType="BALLOON"/>
+    </extensions>
+
+    <actions>
+        <action
+            id="DiffSense.GenerateCommitMessage"
+            class="com.prathanbomb.diffsense.actions.GenerateCommitMessageAction"
+            text="Generate with AI"
+            description="Generate commit message using AI"
+            icon="AllIcons.Actions.Lightning">
+            <add-to-group group-id="Vcs.MessageActionGroup" anchor="first"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt G"/>
+        </action>
+    </actions>
+</idea-plugin>
