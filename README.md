@@ -75,7 +75,7 @@ Run the plugin in a sandbox IDE:
 
 ## Requirements
 
-- IntelliJ IDEA 2023.3 or later
+- IntelliJ IDEA 2023.3 - 2025.3
 - Git integration enabled
 
 ## License
