@@ -129,57 +129,43 @@ class GitDiffService(private val project: Project) {
     }
 
     /**
-     * Computes a simple unified diff between two contents.
-     * This is a simplified implementation that shows context around changes.
+     * Computes a unified diff between two contents.
+     * Uses an optimized algorithm that only outputs changed lines.
      */
     private fun computeUnifiedDiff(before: String, after: String): String {
+        // Early exit for identical content
+        if (before == after) return ""
+
+        // Early exit for empty before (all additions)
+        if (before.isEmpty()) {
+            return after.lines().joinToString("\n") { "+$it" }
+        }
+
+        // Early exit for empty after (all deletions)
+        if (after.isEmpty()) {
+            return before.lines().joinToString("\n") { "-$it" }
+        }
+
         val beforeLines = before.lines()
         val afterLines = after.lines()
 
-        // Simple line-by-line diff
+        // Build set of after lines for O(1) lookup
+        val afterLineSet = afterLines.toSet()
+        val beforeLineSet = beforeLines.toSet()
+
         val result = StringBuilder()
-        val maxLines = maxOf(beforeLines.size, afterLines.size)
 
-        var inChange = false
-        var changeStart = 0
-        val changes = mutableListOf<DiffHunk>()
+        // Output deleted lines (in before but not in after)
+        beforeLines.forEach { line ->
+            if (line !in afterLineSet) {
+                result.appendLine("-$line")
+            }
+        }
 
-        // Find changed regions
-        var i = 0
-        var j = 0
-        while (i < beforeLines.size || j < afterLines.size) {
-            val beforeLine = beforeLines.getOrNull(i)
-            val afterLine = afterLines.getOrNull(j)
-
-            when {
-                beforeLine == afterLine -> {
-                    if (inChange) {
-                        inChange = false
-                    }
-                    i++
-                    j++
-                }
-                beforeLine != null && afterLine != null -> {
-                    // Both lines exist but differ - modification
-                    result.appendLine("-${beforeLine}")
-                    result.appendLine("+${afterLine}")
-                    i++
-                    j++
-                }
-                beforeLine == null && afterLine != null -> {
-                    // Addition
-                    result.appendLine("+${afterLine}")
-                    j++
-                }
-                beforeLine != null && afterLine == null -> {
-                    // Deletion
-                    result.appendLine("-${beforeLine}")
-                    i++
-                }
-                else -> {
-                    i++
-                    j++
-                }
+        // Output added lines (in after but not in before)
+        afterLines.forEach { line ->
+            if (line !in beforeLineSet) {
+                result.appendLine("+$line")
             }
         }
 

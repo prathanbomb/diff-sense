@@ -4,11 +4,9 @@ import com.google.gson.Gson
 import com.prathanbomb.diffsense.model.ChatMessage
 import com.prathanbomb.diffsense.model.OpenAIChatRequest
 import com.prathanbomb.diffsense.settings.ProviderType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
-import java.util.concurrent.TimeUnit
 
 /**
  * AI Provider implementation for Ollama (local LLM).
@@ -30,13 +28,7 @@ class OllamaProvider : OpenAIProvider() {
         val request = buildRequest(prompt, apiKey, baseUrl, model)
 
         return try {
-            val client = OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(120, TimeUnit.SECONDS) // Longer timeout for local models
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .build()
-
-            client.newCall(request).execute().use { response ->
+            HttpClientFactory.client.newCall(request).execute().use { response ->
                 handleResponse(response)
             }
         } catch (e: IOException) {

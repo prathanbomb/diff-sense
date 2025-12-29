@@ -6,6 +6,8 @@ import com.prathanbomb.diffsense.providers.AIProvider
 import com.prathanbomb.diffsense.providers.AIProviderException
 import com.prathanbomb.diffsense.settings.ApiKeyManager
 import com.prathanbomb.diffsense.settings.PluginSettingsState
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 @Service(Service.Level.APP)
 class CommitMessageGenerator {
@@ -17,7 +19,25 @@ class CommitMessageGenerator {
         get() = ApiKeyManager.getInstance()
 
     /**
+     * Cache for generated messages.
+     * Key: hash of (diff + provider + model + template)
+     * Value: CachedMessage with timestamp and content
+     */
+    private val messageCache = ConcurrentHashMap<String, CachedMessage>()
+
+    /**
+     * Cache TTL in milliseconds (5 minutes)
+     */
+    private val cacheTtlMs = 5 * 60 * 1000L
+
+    /**
+     * Maximum cache size
+     */
+    private val maxCacheSize = 20
+
+    /**
      * Generates a commit message for the provided diff content.
+     * Uses caching to avoid redundant API calls for the same diff.
      *
      * @param diff The diff content to generate a message for
      * @return Result containing the generated message or an error
@@ -35,6 +55,13 @@ class CommitMessageGenerator {
             return apiKeyResult
         }
 
+        // Check cache first
+        val cacheKey = computeCacheKey(diff)
+        val cachedMessage = messageCache[cacheKey]
+        if (cachedMessage != null && !cachedMessage.isExpired(cacheTtlMs)) {
+            return Result.success(cachedMessage.message)
+        }
+
         // Build the prompt
         val prompt = buildPrompt(settings.promptTemplate, diff)
 
@@ -42,12 +69,56 @@ class CommitMessageGenerator {
         val provider = AIProvider.create(settings.providerType)
 
         // Make the API call
-        return provider.generateCommitMessage(
+        val result = provider.generateCommitMessage(
             prompt = prompt,
             apiKey = apiKeyManager.getApiKey(settings.providerType),
             baseUrl = settings.effectiveBaseUrl,
             model = settings.effectiveModelName
         )
+
+        // Cache successful results
+        if (result.isSuccess) {
+            result.getOrNull()?.let { message ->
+                cleanupCacheIfNeeded()
+                messageCache[cacheKey] = CachedMessage(message)
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Computes a cache key based on diff, provider, model, and template.
+     */
+    private fun computeCacheKey(diff: String): String {
+        val input = "${diff}|${settings.providerType}|${settings.effectiveModelName}|${settings.promptTemplate}"
+        val md = MessageDigest.getInstance("MD5")
+        val digest = md.digest(input.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Removes expired entries and limits cache size.
+     */
+    private fun cleanupCacheIfNeeded() {
+        // Remove expired entries
+        val now = System.currentTimeMillis()
+        messageCache.entries.removeIf { it.value.isExpired(cacheTtlMs) }
+
+        // Limit cache size by removing oldest entries
+        if (messageCache.size >= maxCacheSize) {
+            val oldest = messageCache.entries
+                .sortedBy { it.value.timestamp }
+                .take(messageCache.size - maxCacheSize + 1)
+            oldest.forEach { messageCache.remove(it.key) }
+        }
+    }
+
+    /**
+     * Clears the message cache.
+     */
+    fun clearCache() {
+        messageCache.clear()
     }
 
     /**
@@ -99,6 +170,18 @@ class CommitMessageGenerator {
         fun getInstance(): CommitMessageGenerator {
             return ApplicationManager.getApplication().getService(CommitMessageGenerator::class.java)
         }
+    }
+}
+
+/**
+ * Cached commit message with timestamp.
+ */
+private data class CachedMessage(
+    val message: String,
+    val timestamp: Long = System.currentTimeMillis()
+) {
+    fun isExpired(ttlMs: Long): Boolean {
+        return System.currentTimeMillis() - timestamp > ttlMs
     }
 }
 
