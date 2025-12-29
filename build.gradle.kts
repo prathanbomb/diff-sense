@@ -74,4 +74,10 @@ intellijPlatform {
             name.set("prathanbomb")
         }
     }
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
+    }
 }
