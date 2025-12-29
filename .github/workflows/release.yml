@@ -8,6 +8,8 @@ jobs:
   publish:
     name: Publish Plugin
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
