@@ -13,6 +13,8 @@ An IntelliJ IDEA plugin that automatically generates Git commit messages using A
 - Customizable prompt templates
 - Secure API key storage using system keychain
 - Configurable diff truncation
+- Test Connection button to verify API configuration
+- Smart button state - automatically disabled when no changes selected or API key missing
 
 ## Installation
 
@@ -71,7 +73,7 @@ Run the plugin in a sandbox IDE:
 | OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` |
 | Anthropic | `https://api.anthropic.com/v1` | `claude-3-5-sonnet-latest` |
 | Ollama | `http://localhost:11434/v1` | `llama3` |
-| Custom | - | - |
+| OpenAI-compatible | - | - |
 
 ## Requirements
 
