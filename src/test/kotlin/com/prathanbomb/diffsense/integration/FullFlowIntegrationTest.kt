@@ -2,7 +2,7 @@ package com.prathanbomb.diffsense.integration
 
 import com.prathanbomb.diffsense.providers.AIProvider
 import com.prathanbomb.diffsense.providers.AnthropicProvider
-import com.prathanbomb.diffsense.providers.CustomProvider
+import com.prathanbomb.diffsense.providers.OpenAICompatibleProvider
 import com.prathanbomb.diffsense.providers.OllamaProvider
 import com.prathanbomb.diffsense.providers.OpenAIProvider
 import com.prathanbomb.diffsense.settings.PluginSettingsState
@@ -176,7 +176,7 @@ class FullFlowIntegrationTest {
         assertTrue(AIProvider.create(ProviderType.OPENAI) is OpenAIProvider)
         assertTrue(AIProvider.create(ProviderType.ANTHROPIC) is AnthropicProvider)
         assertTrue(AIProvider.create(ProviderType.OLLAMA) is OllamaProvider)
-        assertTrue(AIProvider.create(ProviderType.CUSTOM) is CustomProvider)
+        assertTrue(AIProvider.create(ProviderType.CUSTOM) is OpenAICompatibleProvider)
     }
 
     @Test
