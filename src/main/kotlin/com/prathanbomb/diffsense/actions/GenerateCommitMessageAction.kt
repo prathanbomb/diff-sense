@@ -56,14 +56,9 @@ class GenerateCommitMessageAction : AnAction() {
         val settings = PluginSettingsState.getInstance()
         val apiKeyManager = ApiKeyManager.getInstance()
 
-        // Check if API key is required but missing
-        // Be optimistic if cache not loaded yet - actual validation happens on click
-        val hasRequiredApiKey = if (settings.providerType.requiresApiKey) {
-            !apiKeyManager.isCacheLoaded(settings.providerType) ||
-                !apiKeyManager.getCachedApiKey(settings.providerType).isNullOrBlank()
-        } else {
-            true // Ollama doesn't require API key
-        }
+        // Check if API key is configured (runs on BGT, so I/O is safe)
+        val hasRequiredApiKey = !settings.providerType.requiresApiKey ||
+            apiKeyManager.hasApiKey(settings.providerType)
 
         // Always show button in commit context
         e.presentation.isVisible = project != null
