@@ -21,7 +21,7 @@ object NotificationHelper {
     /**
      * Shows an informational notification.
      */
-    fun showInfo(project: Project, message: String, title: String? = null) {
+    fun showInfo(project: Project?, message: String, title: String? = null) {
         createNotification(title, message, NotificationType.INFORMATION)
             .notify(project)
     }
@@ -29,7 +29,7 @@ object NotificationHelper {
     /**
      * Shows a warning notification.
      */
-    fun showWarning(project: Project, message: String, title: String? = null) {
+    fun showWarning(project: Project?, message: String, title: String? = null) {
         createNotification(title, message, NotificationType.WARNING)
             .notify(project)
     }
@@ -37,7 +37,7 @@ object NotificationHelper {
     /**
      * Shows an error notification.
      */
-    fun showError(project: Project, message: String, title: String? = null) {
+    fun showError(project: Project?, message: String, title: String? = null) {
         createNotification(title, message, NotificationType.ERROR)
             .notify(project)
     }

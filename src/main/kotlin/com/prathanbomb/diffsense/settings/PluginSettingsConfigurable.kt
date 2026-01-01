@@ -1,7 +1,10 @@
 package com.prathanbomb.diffsense.settings
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.ui.ComboBox
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBScrollPane
@@ -9,8 +12,12 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
+import com.prathanbomb.diffsense.providers.AIProvider
 import java.awt.Dimension
+import java.awt.FlowLayout
+import javax.swing.Box
 import javax.swing.DefaultComboBoxModel
+import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JSpinner
@@ -25,6 +32,8 @@ class PluginSettingsConfigurable : Configurable {
     private lateinit var promptTemplateArea: JBTextArea
     private lateinit var apiKeyField: JBPasswordField
     private lateinit var maxDiffLengthSpinner: JSpinner
+    private lateinit var testConnectionButton: JButton
+    private lateinit var testResultLabel: JBLabel
 
     // Track original API keys loaded from storage (for isModified check)
     private val originalApiKeys = mutableMapOf<ProviderType, String>()
@@ -76,12 +85,24 @@ class PluginSettingsConfigurable : Configurable {
             )
         )
 
+        // Test connection button and result label
+        testConnectionButton = JButton("Test Connection").apply {
+            addActionListener { onTestConnection() }
+        }
+        testResultLabel = JBLabel("")
+        val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply {
+            add(testConnectionButton)
+            add(Box.createHorizontalStrut(10))
+            add(testResultLabel)
+        }
+
         // Build the form
         mainPanel = FormBuilder.createFormBuilder()
             .addLabeledComponent(JBLabel("Provider:"), providerComboBox, 1, false)
             .addLabeledComponent(JBLabel("Base URL:"), baseUrlField, 1, false)
             .addLabeledComponent(JBLabel("Model:"), modelNameField, 1, false)
             .addLabeledComponent(JBLabel("API Key:"), apiKeyField, 1, false)
+            .addLabeledComponent(JBLabel(""), buttonPanel, 1, false)
             .addLabeledComponent(JBLabel("Max Diff Length:"), maxDiffLengthSpinner, 1, false)
             .addSeparator()
             .addLabeledComponent(
@@ -126,6 +147,9 @@ class PluginSettingsConfigurable : Configurable {
         baseUrlField.emptyText.text = "Default: ${selectedProvider.defaultBaseUrl}"
         modelNameField.emptyText.text = "Default: ${PluginSettingsState.getDefaultModelForProvider(selectedProvider)}"
 
+        // Clear test result when provider changes
+        testResultLabel.text = ""
+
         // Use cached API key (EDT-safe)
         if (apiKeyManager.isCacheLoaded(selectedProvider)) {
             val storedKey = apiKeyManager.getCachedApiKey(selectedProvider)
@@ -138,6 +162,62 @@ class PluginSettingsConfigurable : Configurable {
                 if (providerComboBox.selectedItem == selectedProvider) {
                     apiKeyField.text = key ?: ""
                 }
+            }
+        }
+    }
+
+    private fun onTestConnection() {
+        val selectedProvider = providerComboBox.selectedItem as? ProviderType ?: return
+        val apiKey = String(apiKeyField.password)
+        val baseUrl = baseUrlField.text.ifBlank { selectedProvider.defaultBaseUrl }
+        val model = modelNameField.text.ifBlank { PluginSettingsState.getDefaultModelForProvider(selectedProvider) }
+
+        // Validate API key if required
+        if (selectedProvider.requiresApiKey && apiKey.isBlank()) {
+            testResultLabel.text = "✗ API key is required"
+            testResultLabel.foreground = JBColor.RED
+            return
+        }
+
+        // Disable button and show testing state
+        testConnectionButton.isEnabled = false
+        testConnectionButton.text = "Testing..."
+        testResultLabel.text = ""
+
+        // Run test on background thread
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val provider = AIProvider.create(selectedProvider)
+                val testPrompt = "Say 'OK' in exactly one word."
+
+                val result = provider.generateCommitMessage(
+                    prompt = testPrompt,
+                    apiKey = apiKey.ifBlank { null },
+                    baseUrl = baseUrl,
+                    model = model
+                )
+
+                // Update UI on EDT
+                ApplicationManager.getApplication().invokeLater({
+                    testConnectionButton.isEnabled = true
+                    testConnectionButton.text = "Test Connection"
+
+                    if (result.isSuccess) {
+                        testResultLabel.text = "✓ Connected"
+                        testResultLabel.foreground = JBColor.GREEN
+                    } else {
+                        val error = result.exceptionOrNull()
+                        testResultLabel.text = "✗ ${error?.message ?: "Connection failed"}"
+                        testResultLabel.foreground = JBColor.RED
+                    }
+                }, ModalityState.any())
+            } catch (e: Exception) {
+                ApplicationManager.getApplication().invokeLater({
+                    testConnectionButton.isEnabled = true
+                    testConnectionButton.text = "Test Connection"
+                    testResultLabel.text = "✗ ${e.message ?: "Connection failed"}"
+                    testResultLabel.foreground = JBColor.RED
+                }, ModalityState.any())
             }
         }
     }

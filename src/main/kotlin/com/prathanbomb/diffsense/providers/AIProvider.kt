@@ -37,7 +37,7 @@ interface AIProvider {
                 ProviderType.OPENAI -> OpenAIProvider()
                 ProviderType.ANTHROPIC -> AnthropicProvider()
                 ProviderType.OLLAMA -> OllamaProvider()
-                ProviderType.CUSTOM -> CustomProvider()
+                ProviderType.CUSTOM -> OpenAICompatibleProvider()
             }
         }
     }
