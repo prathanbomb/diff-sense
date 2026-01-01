@@ -14,6 +14,8 @@ import com.intellij.vcs.commit.CommitWorkflowUi
 import com.prathanbomb.diffsense.services.CommitMessageGenerator
 import com.prathanbomb.diffsense.services.GenerationException
 import com.prathanbomb.diffsense.services.GitDiffService
+import com.prathanbomb.diffsense.settings.ApiKeyManager
+import com.prathanbomb.diffsense.settings.PluginSettingsState
 import com.prathanbomb.diffsense.util.NotificationHelper
 
 /**
@@ -21,6 +23,11 @@ import com.prathanbomb.diffsense.util.NotificationHelper
  * Appears in the commit dialog toolbar.
  */
 class GenerateCommitMessageAction : AnAction() {
+
+    companion object {
+        @Volatile
+        private var isGenerating = false
+    }
 
     override fun getActionUpdateThread(): ActionUpdateThread {
         return ActionUpdateThread.BGT
@@ -46,9 +53,23 @@ class GenerateCommitMessageAction : AnAction() {
     override fun update(e: AnActionEvent) {
         val project = e.project
         val changes = getSelectedChanges(e)
+        val settings = PluginSettingsState.getInstance()
+        val apiKeyManager = ApiKeyManager.getInstance()
 
-        // Enable action only when in commit context with changes
-        e.presentation.isEnabledAndVisible = project != null && !changes.isNullOrEmpty()
+        // Check if API key is required but missing
+        // Be optimistic if cache not loaded yet - actual validation happens on click
+        val hasRequiredApiKey = if (settings.providerType.requiresApiKey) {
+            !apiKeyManager.isCacheLoaded(settings.providerType) ||
+                !apiKeyManager.getCachedApiKey(settings.providerType).isNullOrBlank()
+        } else {
+            true // Ollama doesn't require API key
+        }
+
+        // Always show button in commit context
+        e.presentation.isVisible = project != null
+
+        // Enable only when changes selected, not generating, and API key configured
+        e.presentation.isEnabled = !changes.isNullOrEmpty() && !isGenerating && hasRequiredApiKey
     }
 
     /**
@@ -83,6 +104,8 @@ class GenerateCommitMessageAction : AnAction() {
         changes: Collection<Change>,
         commitMessageUi: CommitMessage?
     ) {
+        isGenerating = true
+
         object : Task.Backgroundable(project, "Generating commit message...", true) {
             private var generatedMessage: String? = null
             private var error: Throwable? = null
@@ -132,6 +155,7 @@ class GenerateCommitMessageAction : AnAction() {
             }
 
             override fun onFinished() {
+                isGenerating = false
                 error?.let { NotificationHelper.showErrorForException(project, it) }
             }
         }.queue()
